@@ -1,4 +1,5 @@
 import logging
+import httpx
 
 from infrastructure.config.config import settings
 from shared.exception.exceptions import A2ARouterError
@@ -28,6 +29,30 @@ class AgentImplementation:
         self.router = A2ARouter()
         self.msg_type = "no-message-setup"
 
+        self.agent_card_register = {}
+        self.by_id = {}
+
+    def is_authorized(self, envelope: A2AEnvelope) -> bool:
+        """The actual rate-limiting logic."""
+        return True
+
+    async def register_sub_agents(self, base_url: str):
+        """Load the sub-agents"""
+        async with httpx.AsyncClient() as client:
+            logger.info("func.register()")
+
+            r = await client.get(f"{base_url}/.well-known/agent.json")
+            card = r.json()
+
+        logger.debug("card %s", card)
+
+        self.by_id[card["name"]] = card
+
+        # capabilities is a list of capability dicts; iterate safely and register consumed messages
+        for cap in card.get("capabilities", []):
+            for msg in cap.get("consumes", []):
+                self.agent_card_register[msg] = card
+
     def receive(self, envelope: A2AEnvelope) -> A2AEnvelope:
         with tracer.start_as_current_span("agent.receive") as span:
             """Main entry point for all incoming messages."""
@@ -37,8 +62,8 @@ class AgentImplementation:
             try:
                 logger.debug(f"envelope: {envelope}")   
 
-                # Call the a2a router
-                result = self.router.route(envelope)
+                # Call the a2a router, load the envelope and the registry of agents (agent_card_register) to find the right sub-agent to process the message
+                result = self.router.route(self.agent_card_register, envelope)
 
                 # Set the response
                 if envelope.message_type == "INVENTORY_REQUEST":

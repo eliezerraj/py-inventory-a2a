@@ -5,7 +5,16 @@ export APP_NAME=py-inventory-a2a.localhost
 export HOST=127.0.0.1
 export URL_AGENT=http://127.0.0.1:7000
 export PORT=7100
-export URL_SERVICE_00=http://127.0.0.1:7000
+
+# cart item service
+export URL_SERVICE_00=http://127.0.0.1:7001
+# inventory service
+export URL_SERVICE_01=http://127.0.0.1:7000
+
+# agent stat
+export URL_AGENT_REGISTER_00=http://127.0.0.1:8000
+# agent kmeans
+export URL_AGENT_REGISTER_01=http://127.0.0.1:8001
 
 export SESSION_TIMEOUT=3000
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://pi-home-01.architecture.caradhras.io:4318/v1/traces

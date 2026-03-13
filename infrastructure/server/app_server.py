@@ -64,6 +64,11 @@ class MiddlewareHeaderContext(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI):
     """ Load the ML model """
     logger.info(" **** Starting up the application...")
+
+    logger.info(" **** Loading sub-agents...")        
+    await agent.register_sub_agents(settings.URL_AGENT_REGISTER_00) 
+    await agent.register_sub_agents(settings.URL_AGENT_REGISTER_01) 
+
     yield
     logger.info(" **** Shutting down the application...")
     logger.info(" **** Closing resources (5 seconds)...")
@@ -111,7 +116,15 @@ def agent_card():
         logger.info("func.get_agent_card()")
         
         return agent.capabilities
-    
+
+@app.get("/agent_card_register")
+def train():
+    with tracer.start_as_current_span("infrastructure.server.agent_card_register"):
+        """Get all agents discovered."""
+        logger.info("func.agent_card_register()")
+
+        return agent.agent_card_register
+
 @app.post("/a2a/message")
 def handle_a2a_message(envelope: A2AEnvelope, request: Request):
     with tracer.start_as_current_span("infrastructure.server.handle_a2a_message") as span:
@@ -125,9 +138,10 @@ def handle_a2a_message(envelope: A2AEnvelope, request: Request):
     
         try:
             result = agent.receive(envelope)
+
             span.set_status(Status(StatusCode.OK))
             return result
-    
+            
         except A2ARouterError as e:
             span.record_exception(e)
             span.set_status(Status(StatusCode.ERROR, str(e)))

@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 # A2A Router
 class A2ARouter:
     
-    def route(self, envelope):
+    def route(self, registry, envelope):
         with tracer.start_as_current_span("a2a.router.route") as span:
             logger.info("def.route()")  
 
             try:
                 if envelope.message_type == "INVENTORY_REQUEST":
-                    return handler_inventory_request(envelope.payload)
+                    return handler_inventory_request(registry, envelope.payload)
                 else:
                     message = f"Unsupported message type: {envelope.message_type}"
                     e = A2ARouterError(message)

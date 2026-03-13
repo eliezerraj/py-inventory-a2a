@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 #---------------------------------
 # Handler for inventory request
-def handler_inventory_request(payload: dict) -> dict:
+def handler_inventory_request(registry, payload: dict) -> dict:
     with tracer.start_as_current_span("infrastructure.adapter.handler.handler_inventory_request") as span:
         logger.info("def.handler_inventory_request()")  
 
-        result = inventory_request(payload["product"])
-
+        result = inventory_request(registry, payload["product"])
+        
         return {
             "message": "inventory requested",
             "result": result
