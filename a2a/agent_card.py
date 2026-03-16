@@ -26,9 +26,27 @@ AGENT_CARD = {
                 },
             },
         },
+        {
+            "intent": "INVENTORY_RUNOUT_ANALYSIS",
+            "description": "Calculates Days of Cover (DoC) based on current available inventory and consumption slope.",
+            "consumes": ["DOC_CALCULATION_REQUEST"],
+            "produces": ["DOC_RESULT"],
+            "input_modes": ["application/json"],
+            "output_modes": ["application/json"],
+            "schema": {
+                "type": "object",
+                "required": ["sku", "available_inventory"],
+                "properties": {
+                    "sku": { "type": "string" },
+                    "available_inventory": { "type": "number" },
+                    "include_slope_details": { "type": "boolean", "default": True }
+                }
+            }
+        }        
     ],
     "skills": {
         "manage_inventory": "Manage inventory levels and optimize stock",
+        "calculate_doc": "Calculate Days of Cover (DoC) using inventory velocity"
     },
     "endpoints": {
         "message": "/a2a/message",
