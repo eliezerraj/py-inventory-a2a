@@ -2,7 +2,7 @@ import logging
 
 from shared.exception.exceptions import A2ARouterError
 
-from infrastructure.adapter.handler import handler_inventory_request
+from infrastructure.adapter.handler import handler_inventory_request, handler_inventory_runout_analysis
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import StatusCode, Status 
@@ -24,6 +24,8 @@ class A2ARouter:
             try:
                 if envelope.message_type == "INVENTORY_REQUEST":
                     return handler_inventory_request(registry, envelope.payload)
+                elif envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
+                    return handler_inventory_runout_analysis(registry, envelope.payload)
                 else:
                     message = f"Unsupported message type: {envelope.message_type}"
                     e = A2ARouterError(message)
