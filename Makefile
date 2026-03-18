@@ -18,7 +18,7 @@ export URL_AGENT_REGISTER_01=http://127.0.0.1:8001
 
 export SESSION_TIMEOUT=3000
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://pi-home-01.architecture.caradhras.io:4318/v1/traces
-export LOG_LEVEL=DEBUG
+export LOG_LEVEL=INFO
 export OTEL_STDOUT_LOG_GROUP=True
 export LOG_GROUP=/mnt/c/Eliezer/log/py-inventory-a2a.log
 

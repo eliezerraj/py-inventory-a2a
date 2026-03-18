@@ -66,11 +66,12 @@ class AgentImplementation:
                 result = self.router.route(self.agent_card_register, envelope)
 
                 # Set the response
-                if envelope.message_type == "INVENTORY_REQUEST":
-                    self.msg_type = "INVENTORY_REQUEST_RESULT"
+                if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
+                    self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
+                elif envelope.message_type == "PRICE_ANALYSIS":
+                    self.msg_type = "PRICE_ANALYSIS_RESULT"
                 else:
                     self.msg_type = "NO_ROUTER"
-                
                 return A2AEnvelope.create(
                     source=self.NAME,
                     target=envelope.source_agent,
