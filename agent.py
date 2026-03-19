@@ -41,17 +41,21 @@ class AgentImplementation:
         async with httpx.AsyncClient() as client:
             logger.info("func.register()")
 
-            r = await client.get(f"{base_url}/.well-known/agent.json")
-            card = r.json()
+            response = await client.get(f"{base_url}/.well-known/agent-card.json")
+            if response.status_code == 404:
+                response = await client.get(f"{base_url}/.well-known/agent-card.json")
+
+            response.raise_for_status()
+            card = response.json()
 
         logger.debug("card %s", card)
 
         self.by_id[card["name"]] = card
 
-        # capabilities is a list of capability dicts; iterate safely and register consumed messages
-        for cap in card.get("capabilities", []):
-            for msg in cap.get("consumes", []):
-                self.agent_card_register[msg] = card
+        for skill in card.get("skills", []):
+            skill_id = skill.get("id")
+            if skill_id:
+                self.agent_card_register[skill_id] = card
 
     def receive(self, envelope: A2AEnvelope) -> A2AEnvelope:
         with tracer.start_as_current_span("agent.receive") as span:
@@ -70,6 +74,8 @@ class AgentImplementation:
                     self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
                 elif envelope.message_type == "PRICE_ANALYSIS":
                     self.msg_type = "PRICE_ANALYSIS_RESULT"
+                elif envelope.message_type == "CLUSTER_FIT":
+                    self.msg_type = "CLUSTER_FIT_RESULT"
                 else:
                     self.msg_type = "NO_ROUTER"
                 return A2AEnvelope.create(

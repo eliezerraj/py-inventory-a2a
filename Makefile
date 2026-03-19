@@ -6,6 +6,7 @@ export HOST=127.0.0.1
 export URL_AGENT=http://127.0.0.1:7000
 export PORT=7100
 
+export WINDOWSIZE=14
 # cart item service
 export URL_SERVICE_00=http://127.0.0.1:7001
 # inventory service

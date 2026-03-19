@@ -14,6 +14,19 @@ from opentelemetry import trace
 tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
 
+WINDOWSIZE=settings.WINDOWSIZE
+
+#---------------------------------
+def _get_sub_agent_url(sub_agent: dict) -> str | None:
+    supported_interfaces = sub_agent.get("supportedInterfaces", []) if isinstance(sub_agent, dict) else []
+    if supported_interfaces:
+        first_interface = supported_interfaces[0]
+        if isinstance(first_interface, dict):
+            return first_interface.get("url")
+
+    return sub_agent.get("url") if isinstance(sub_agent, dict) else None
+
+
 #---------------------------------
 def price_analysis(registry, product: dict) -> dict:
     with tracer.start_as_current_span("domain.service.price_analysis"):
@@ -38,8 +51,8 @@ def price_analysis(registry, product: dict) -> dict:
                 continue
 
             # -----------------------------------------------------
-            # check and get the cart item data (service cart-item)
-            res_cart_item_window = send_message(settings.URL_SERVICE_00 + "/cartItem/list/product/" + sku, 
+            # check and get the cart item data (service cart-item) 
+            res_cart_item_window = send_message(f"{settings.URL_SERVICE_00}/cartItem/list/product?sku={sku}&window={WINDOWSIZE}",
                 method="GET",
                 headers=headers,
                 timeout=10.0)
@@ -66,7 +79,7 @@ def price_analysis(registry, product: dict) -> dict:
 
             # Calculate the PRICE stats using a2a stat
             sub_agent = registry.get("COMPUTE_STAT")
-            sub_agent_host = sub_agent.get("url")
+            sub_agent_host = _get_sub_agent_url(sub_agent)
             sub_agent_name = sub_agent["name"]
             sub_agent_msg_type = "COMPUTE_STAT"
             
@@ -79,7 +92,7 @@ def price_analysis(registry, product: dict) -> dict:
                 }
             )
             
-            stats_price = send_message(sub_agent_host + "/a2a/message", 
+            stats_price = send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
@@ -110,7 +123,7 @@ def price_analysis(registry, product: dict) -> dict:
                 }
             )
 
-            stats_quantity = send_message(sub_agent_host + "/a2a/message", 
+            stats_quantity = send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
@@ -179,8 +192,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         # -----------------------------------------------------
         # get the timeseries inventory window data (service inventory)
 
-        window=10
-        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={product.get('sku', '')}&window={window}", 
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE}", 
             method="GET",
             headers=headers,
             timeout=10.0)
@@ -209,7 +221,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         # -----------------------------------------------------
         # Calculate PENDING OREDER the stats using a2a stat
         sub_agent = registry.get("COMPUTE_STAT")
-        sub_agent_host = sub_agent.get("url")
+        sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "COMPUTE_STAT"
         
@@ -222,7 +234,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             }
         )
         
-        stats_pending = send_message(sub_agent_host + "/a2a/message", 
+        stats_pending = send_message(sub_agent_host,
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
@@ -246,7 +258,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             }
         )
         
-        stats_available = send_message(sub_agent_host + "/a2a/message", 
+        stats_available = send_message(sub_agent_host,
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),

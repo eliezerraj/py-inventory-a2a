@@ -2,7 +2,7 @@ import logging
 
 from shared.exception.exceptions import A2ARouterError
 
-from infrastructure.adapter.handler import handler_price_analysis, handler_inventory_runout_analysis
+from infrastructure.adapter.handler import handler_price_analysis, handler_inventory_runout_analysis, handler_cluster_fit
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import StatusCode, Status 
@@ -26,6 +26,8 @@ class A2ARouter:
                     return handler_price_analysis(registry, envelope.payload)
                 elif envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
                     return handler_inventory_runout_analysis(registry, envelope.payload)
+                elif envelope.message_type == "CLUSTER_FIT":
+                    return handler_cluster_fit(registry, envelope.payload)
                 else:
                     message = f"Unsupported message type: {envelope.message_type}"
                     e = A2ARouterError(message)

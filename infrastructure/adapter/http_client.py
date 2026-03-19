@@ -6,6 +6,7 @@ import httpx
 from a2a.envelope import A2AEnvelope
 
 from opentelemetry import trace
+from opentelemetry.propagate import inject
 from opentelemetry.sdk.trace import StatusCode, Status
 
 #---------------------------------
@@ -13,6 +14,12 @@ from opentelemetry.sdk.trace import StatusCode, Status
 #---------------------------------
 tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
+
+
+def _build_headers(headers: dict[str, str] | None = None) -> dict[str, str]:
+    request_headers = dict(headers or {})
+    inject(request_headers)
+    return request_headers
 
 
 def _extract_backend_message(response_body: Any) -> str | None:
@@ -85,13 +92,14 @@ def _request(
 
         span.set_attribute("http.method", method.upper())
         span.set_attribute("http.url", url)
+        request_headers = _build_headers(headers)
 
         try:
             with httpx.Client(timeout=timeout) as client:
                 r = client.request(
                     method=method.upper(),
                     url=url,
-                    headers=headers,
+                    headers=request_headers,
                     params=params,
                     json=body,
                 )
