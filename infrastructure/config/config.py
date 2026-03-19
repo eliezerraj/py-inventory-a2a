@@ -14,7 +14,12 @@ class Settings:
         self.PORT = os.getenv("PORT")
         self.SESSION_TIMEOUT = int(os.getenv("SESSION_TIMEOUT")) 
 
+        self.WINDOWSIZE = int(os.getenv("WINDOWSIZE", "24"))  # Default to 24 if not set    
         self.URL_SERVICE_00 = os.getenv("URL_SERVICE_00")
+        self.URL_SERVICE_01 = os.getenv("URL_SERVICE_01")
+
+        self.URL_AGENT_REGISTER_00 = os.getenv("URL_AGENT_REGISTER_00")
+        self.URL_AGENT_REGISTER_01 = os.getenv("URL_AGENT_REGISTER_01")
 
         self.OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

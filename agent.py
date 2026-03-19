@@ -1,4 +1,5 @@
 import logging
+import httpx
 
 from infrastructure.config.config import settings
 from shared.exception.exceptions import A2ARouterError
@@ -28,6 +29,34 @@ class AgentImplementation:
         self.router = A2ARouter()
         self.msg_type = "no-message-setup"
 
+        self.agent_card_register = {}
+        self.by_id = {}
+
+    def is_authorized(self, envelope: A2AEnvelope) -> bool:
+        """The actual rate-limiting logic."""
+        return True
+
+    async def register_sub_agents(self, base_url: str):
+        """Load the sub-agents"""
+        async with httpx.AsyncClient() as client:
+            logger.info("func.register()")
+
+            response = await client.get(f"{base_url}/.well-known/agent-card.json")
+            if response.status_code == 404:
+                response = await client.get(f"{base_url}/.well-known/agent-card.json")
+
+            response.raise_for_status()
+            card = response.json()
+
+        logger.debug("card %s", card)
+
+        self.by_id[card["name"]] = card
+
+        for skill in card.get("skills", []):
+            skill_id = skill.get("id")
+            if skill_id:
+                self.agent_card_register[skill_id] = card
+
     def receive(self, envelope: A2AEnvelope) -> A2AEnvelope:
         with tracer.start_as_current_span("agent.receive") as span:
             """Main entry point for all incoming messages."""
@@ -37,15 +66,18 @@ class AgentImplementation:
             try:
                 logger.debug(f"envelope: {envelope}")   
 
-                # Call the a2a router
-                result = self.router.route(envelope)
+                # Call the a2a router, load the envelope and the registry of agents (agent_card_register) to find the right sub-agent to process the message
+                result = self.router.route(self.agent_card_register, envelope)
 
                 # Set the response
-                if envelope.message_type == "INVENTORY_REQUEST":
-                    self.msg_type = "INVENTORY_REQUEST_RESULT"
+                if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
+                    self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
+                elif envelope.message_type == "PRICE_ANALYSIS":
+                    self.msg_type = "PRICE_ANALYSIS_RESULT"
+                elif envelope.message_type == "CLUSTER_FIT":
+                    self.msg_type = "CLUSTER_FIT_RESULT"
                 else:
                     self.msg_type = "NO_ROUTER"
-                
                 return A2AEnvelope.create(
                     source=self.NAME,
                     target=envelope.source_agent,
