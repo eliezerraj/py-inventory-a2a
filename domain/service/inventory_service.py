@@ -26,7 +26,6 @@ def _get_sub_agent_url(sub_agent: dict) -> str | None:
 
     return sub_agent.get("url") if isinstance(sub_agent, dict) else None
 
-
 #---------------------------------
 def price_analysis(registry, product: dict) -> dict:
     with tracer.start_as_current_span("domain.service.price_analysis"):
@@ -61,21 +60,22 @@ def price_analysis(registry, product: dict) -> dict:
             if isinstance(raw_items, dict):
                 raw_items = raw_items.get("data", [])
 
-            quantities = []
-            prices = []
+            cart_quantities = []
+            cart_prices = []
 
             for item in raw_items:
                 quantity = item.get("quantity") if isinstance(item, dict) else getattr(item, "quantity", None)
                 if quantity is not None:
-                    quantities.append(quantity)
+                    cart_quantities.append(quantity)
                 price = item.get("price") if isinstance(item, dict) else getattr(item, "price", None)
                 if price is not None:
-                    prices.append(price)
+                    cart_prices.append(price)
 
             print("-------------quantities-----------------------")
-            print(quantities)
+            print(cart_quantities)
             print("-------------prices-----------------------")
-            print(prices)
+            print(cart_prices)
+            print("-------------prices-----------------------")
 
             # Calculate the PRICE stats using a2a stat
             sub_agent = registry.get("COMPUTE_STAT")
@@ -88,29 +88,30 @@ def price_analysis(registry, product: dict) -> dict:
                 target_agent=sub_agent_name,
                 message_type=sub_agent_msg_type,
                 payload={
-                    "data": prices,
+                    "data": cart_prices,
                 }
             )
             
-            stats_price = send_message(sub_agent_host,
+            prices_stats = send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
                 timeout=10.0)
             
-            slope_price = (
-                stats_price.get("data", {})
+            # extract features
+            price_n_slope = (
+                prices_stats.get("data", {})
                 .get("payload", {})
                 .get("data", {})
                 .get("n_slope")
-            ) if isinstance(stats_price, dict) else None
+            ) if isinstance(prices_stats, dict) else None
 
-            mean_price = (
-                stats_price.get("data", {})
+            price_mean = (
+                prices_stats.get("data", {})
                 .get("payload", {})
                 .get("data", {})
                 .get("mean")
-            ) if isinstance(stats_price, dict) else None
+            ) if isinstance(prices_stats, dict) else None
 
             #------------------------------------------------------
             # Calculate the QUANTITY stats using a2a stat
@@ -119,37 +120,37 @@ def price_analysis(registry, product: dict) -> dict:
                 target_agent=sub_agent_name,
                 message_type=sub_agent_msg_type,
                 payload={
-                    "data": quantities,
+                    "data": cart_quantities,
                 }
             )
 
-            stats_quantity = send_message(sub_agent_host,
+            quantities_stats = send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
                 timeout=10.0)
             
-            slope_quantity = (
-                stats_quantity.get("data", {})
+            quantity_n_slope = (
+                quantities_stats.get("data", {})
                 .get("payload", {})
                 .get("data", {})
                 .get("n_slope")
-            ) if isinstance(stats_quantity, dict) else None
+            ) if isinstance(quantities_stats, dict) else None
 
-            mean_quantity = (
-                stats_quantity.get("data", {})
+            quantity_mean = (
+                quantities_stats.get("data", {})
                 .get("payload", {})
                 .get("data", {})
                 .get("mean")
-            ) if isinstance(stats_quantity, dict) else None
+            ) if isinstance(quantities_stats, dict) else None
 
             #------------------------------------------------------
 
-            if slope_price < -2 and slope_quantity > 2:
+            if price_n_slope < -2 and quantity_n_slope > 2:
                 action = "INCREASING PRICE"
-            elif slope_price < -2 and slope_quantity < -2:
+            elif price_n_slope < -2 and quantity_n_slope < -2:
                 action = "STOP SALES 10(MINUTES) - CHECK QUALITY"
-            elif slope_price > 2 and slope_quantity > 2:
+            elif price_n_slope > 2 and quantity_n_slope > 2:
                 action = "STOP SALES 10(MINUTES) - RUNOUT RISK"
             else:
                 action = "STEADY PRICE"
@@ -158,12 +159,12 @@ def price_analysis(registry, product: dict) -> dict:
                 "sku": sku,
                 "action": action,
                 "metadata": {  
-                    #"cart_item_quantities": quantities,
-                    #"cart_item_prices": prices,
-                    "mean_price": mean_price,
-                    "n_slope_price": slope_price,
-                    "mean_quantity": mean_quantity,
-                    "n_slope_quantity": slope_quantity,
+                    "price_mean": price_mean,
+                    "price_n_slope": price_n_slope,
+                    "quantity_mean": quantity_mean,
+                    "quantity_n_slope": quantity_n_slope,
+                    "cart_quantities": cart_quantities,
+                    "cart_prices": cart_prices,
                 }
             }
 
@@ -175,8 +176,6 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
     with tracer.start_as_current_span("domain.service.inventory_runout_analysis"):
         logger.info("def.inventory_runout_analysis()")    
 
-        print("------------------------------------")
-        print(registry)
         print("------------------------------------")
         print(product)
         print("------------------------------------")
@@ -190,9 +189,8 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
                     "X-Request-ID": REQUEST_ID_CTX.get()}
 
         # -----------------------------------------------------
-        # get the timeseries inventory window data (service inventory)
-
-        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE}", 
+        # get the timeseries inventory window data (service inventory). WINDONSIZE * 2 is because the endpoint returns dupe lines (pending and available in different lines )
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE*2}", 
             method="GET",
             headers=headers,
             timeout=10.0)
@@ -201,25 +199,29 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         if isinstance(raw_items, dict):
             raw_items = raw_items.get("data", [])
 
-        data_pending = []
+        #extract inventory only the lines with pending 
+        raw_items = [item for item in raw_items if isinstance(item, dict) and "pending" in item]
+
+        inventory_pending = []
         for item in raw_items:
             pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
             if pending is not None:
-                data_pending.append(pending)
+                inventory_pending.append(pending)
 
-        data_available = []
+        inventory_available = []
         for item in raw_items:
             available = item.get("available") if isinstance(item, dict) else getattr(item, "available", None)
             if available is not None:
-                data_available.append(available)
+                inventory_available.append(available)
 
-        print("-------------data_pending-----------------------")
-        print(data_pending)
-        print("-------------data_available-----------------------")
-        print(data_available)
+        print("-------------inventory_pending-----------------------")
+        print(inventory_pending)
+        print("-------------inventory_available-----------------------")
+        print(inventory_available)
+        print("-------------inventory_available-----------------------")
 
         # -----------------------------------------------------
-        # Calculate PENDING OREDER the stats using a2a stat
+        # Calculate PENDING ORDER the stats using a2a stat
         sub_agent = registry.get("COMPUTE_STAT")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
@@ -230,22 +232,23 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             target_agent=sub_agent_name,
             message_type=sub_agent_msg_type,
             payload={
-                "data": data_pending,
+                "data": inventory_pending,
             }
         )
         
-        stats_pending = send_message(sub_agent_host,
+        inventory_pending_stats = send_message(sub_agent_host,
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
             timeout=10.0)
 
-        slope_pending = (
-            stats_pending.get("data", {})
+        # extract the features
+        inventory_pending_slope = (
+            inventory_pending_stats.get("data", {})
             .get("payload", {})
             .get("data", {})
             .get("n_slope")
-        ) if isinstance(stats_pending, dict) else None
+        ) if isinstance(inventory_pending_stats, dict) else None
 
         # -----------------------------------------------------
         # calculate INVENTORY AVAILABLE using a2a stat
@@ -254,48 +257,51 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             target_agent=sub_agent_name,
             message_type=sub_agent_msg_type,
             payload={
-                "data": data_available,
+                "data": inventory_available,
             }
         )
         
-        stats_available = send_message(sub_agent_host,
+        inventory_available_stats = send_message(sub_agent_host,
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
             timeout=10.0)
 
-        slope_available = (
-            stats_available.get("data", {})
+        # extract the features
+        inventory_available_slope = (
+            inventory_available_stats.get("data", {})
             .get("payload", {})
             .get("data", {})
             .get("n_slope")
-        ) if isinstance(stats_available, dict) else None
+        ) if isinstance(inventory_available_stats, dict) else None
 
-        print("-------------stats_pending-----------------------")
-        print(stats_pending)
-        print("-------------stats_available-----------------------")
-        print(stats_available)
-        print("-------------res_inventory_window-----------------------")
-        print(res_inventory_window)
+        #print("-------------inventory_pending_stats-----------------------")
+        #print(inventory_pending_stats)
+        #print("-------------inventory_available_stats-----------------------")
+        #print(inventory_available_stats)
+        #print("-------------res_inventory_window-----------------------")
+        #print(res_inventory_window)
 
-        available = None
+        current_inventory_available = None
         lead_time = None
         if isinstance(res_inventory_window, dict):
             inventory_data = res_inventory_window.get("data", [])
             if isinstance(inventory_data, list) and len(inventory_data) > 0 and isinstance(inventory_data[-1], dict):
-                available = inventory_data[-1].get("available")
+                current_inventory_available = inventory_data[-1].get("available")
                 lead_time = inventory_data[-1].get("product", {}).get("lead_time")
 
-        days_of_cover = available/abs(slope_pending) if slope_pending and slope_pending != 0 else None
+        days_of_cover = current_inventory_available/abs(inventory_pending_slope) if inventory_pending_slope and inventory_pending_slope != 0 else None
 
         return {
             "sku": product.get("sku"),
             "action": "CRITICAL" if days_of_cover < inventory_data[-1].get("product", {}).get("lead_time", 0) else "OK",
             "metadata": {  
-                "n_slope_sales_pending": slope_pending,
-                "n_slope_inventory_available": slope_available,
-                "inventory_available": available,
+                "inventory_pending_slope": inventory_pending_slope,
+                "inventory_available_slope": inventory_available_slope,
+                "current_inventory_available": current_inventory_available,
                 "lead_time": lead_time,
-                "days_of_cover": days_of_cover
+                "days_of_cover": days_of_cover,
+                "inventory_pending": inventory_pending,
+                "inventory_available": inventory_available
             }
         }

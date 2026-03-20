@@ -72,10 +72,12 @@ class AgentImplementation:
                 # Set the response
                 if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
                     self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
-                elif envelope.message_type == "PRICE_ANALYSIS":
-                    self.msg_type = "PRICE_ANALYSIS_RESULT"
-                elif envelope.message_type == "CLUSTER_FIT":
-                    self.msg_type = "CLUSTER_FIT_RESULT"
+                elif envelope.message_type == "INVENTORY_PRICE_ANALYSIS":
+                    self.msg_type = "INVENTORY_PRICE_ANALYSIS_RESULT"
+                elif envelope.message_type == "INVENTORY_CLUSTER_FIT":
+                    self.msg_type = "INVENTORY_CLUSTER_FIT_RESULT"
+                elif envelope.message_type == "INVENTORY_CLUSTER_DATA":
+                    self.msg_type = "INVENTORY_CLUSTER_DATA_RESULT"
                 else:
                     self.msg_type = "NO_ROUTER"
                 return A2AEnvelope.create(

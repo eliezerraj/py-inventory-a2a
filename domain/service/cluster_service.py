@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 
 WINDOWSIZE=settings.WINDOWSIZE
 
-LIMIT=5
+LIMIT=30
 OFFSET=0
-SKU="coffee"
 
 #---------------------------------
 def _get_sub_agent_url(sub_agent: dict) -> str | None:
@@ -34,11 +33,17 @@ def cluster_fit(registry, product: dict) -> dict:
     with tracer.start_as_current_span("domain.service.cluster_fit"):
         logger.info("def.cluster_fit()")
 
+        if not product:
+            logger.warning("No values enough provided for inventory inference.")
+            return "false"
+        
+        sku = product.get('sku', '')
+        
         headers = {"Content-Type": "application/json",
                     "Accept": "application/json",
                     "X-Request-ID": REQUEST_ID_CTX.get()}
 
-        res_list_inventory = send_message( f"{settings.URL_SERVICE_01}/list/inventory/product?sku={SKU}&window={LIMIT}&offset={OFFSET}", 
+        res_list_inventory = send_message( f"{settings.URL_SERVICE_01}/list/inventory/product?sku={sku}&window={LIMIT}&offset={OFFSET}", 
             method="GET",
             headers=headers,
             timeout=10.0)
@@ -47,18 +52,18 @@ def cluster_fit(registry, product: dict) -> dict:
         if isinstance(raw_items, dict):
             raw_items = raw_items.get("data", [])
 
-        #print("-------------raw_items-----------------------")
-        #print(raw_items[:5])
-        #print("-------------raw_items-----------------------")
-
+        list_features = []
+        list_skus = []
         for item in raw_items:
             product = item.get("product", {})
             sku = product.get("sku")
             if not sku:
                 continue
 
+            list_skus.append(sku)
             print(f"sku: {sku}")
 
+            # get timeseries inventory data
             res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={sku}&window={WINDOWSIZE}", 
                 method="GET",
                 headers=headers,
@@ -68,17 +73,17 @@ def cluster_fit(registry, product: dict) -> dict:
             if isinstance(raw_items, dict):
                 raw_items = raw_items.get("data", [])
 
-            data_pending = []
+            inventory_pending = []
             for item in raw_items:
                 pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
                 if pending is not None:
-                    data_pending.append(pending)
+                    inventory_pending.append(pending)
 
-            data_available = []
+            inventory_available = []
             for item in raw_items:
                 available = item.get("available") if isinstance(item, dict) else getattr(item, "available", None)
                 if available is not None:
-                    data_available.append(available)
+                    inventory_available.append(available)
 
             # -----------------------------------------------------
             # Calculate PENDING ORDER the stats using a2a stat
@@ -92,27 +97,203 @@ def cluster_fit(registry, product: dict) -> dict:
                 target_agent=sub_agent_name,
                 message_type=sub_agent_msg_type,
                 payload={
-                    "data": data_pending,
+                    "data": inventory_available,
                 }
             )
             
-            stats_pending = send_message(sub_agent_host,
+            inventory_available_stat= send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
                 timeout=10.0)
 
-            slope_pending = (
-                stats_pending.get("data", {})
+            # extract the features
+            inventory_available_slope = (
+                inventory_available_stat.get("data", {})
                 .get("payload", {})
                 .get("data", {})
                 .get("n_slope")
-            ) if isinstance(stats_pending, dict) else None
+            ) if isinstance(inventory_available_stat, dict) else None
 
-            print("-------------stats_pending-----------------------")
-            print(stats_pending)
-            #print("-------------stats_available-----------------------")
-            #print(stats_available)
-            #print("-------------res_inventory_window-----------------------")
-            #print(res_inventory_window)
-            #print("-------------res_list_inventory-----------------------")
+            inventory_available_mean = (
+                inventory_available_stat.get("data", {})
+                .get("payload", {})
+                .get("data", {})
+                .get("mean")
+            ) if isinstance(inventory_available_stat, dict) else None
+
+            inventory_available_median_abs_deviation = (
+                inventory_available_stat.get("data", {})
+                .get("payload", {})
+                .get("data", {})
+                .get("median_abs_deviation")
+            ) if isinstance(inventory_available_stat, dict) else None
+
+            print("-------------inventory_data-----------------------")
+            print(f"sku {sku} = {inventory_available}")
+            print(inventory_available_slope)
+            print(inventory_available_mean)
+            print(inventory_available_median_abs_deviation)    
+            print("-------------inventory_data-----------------------")
+
+            features = {
+                "feature_01": inventory_available_mean,
+                "feature_02": inventory_available_median_abs_deviation,
+                "feature_03": inventory_available_slope
+            } 
+
+            list_features.append(features)
+
+        # ------------------------------------------
+        # Cluster the products using the a2a cluster agent
+        sub_agent = registry.get("CLUSTER_FIT")
+        sub_agent_host = _get_sub_agent_url(sub_agent)
+        sub_agent_name = sub_agent["name"]
+        sub_agent_msg_type = "CLUSTER_FIT"
+            
+        envelope = A2AEnvelope(
+            source_agent=settings.APP_NAME,
+            target_agent=sub_agent_name,
+            message_type=sub_agent_msg_type,
+            payload=list_features
+        )
+
+        list_features_fitted= send_message(sub_agent_host,
+                method="POST",
+                headers=headers,
+                body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
+                timeout=10.0)
+
+        return {"data": list_features_fitted.get('data',{}).get('payload',{}).get('data',{}) if isinstance(list_features_fitted, dict) else None    ,
+                "metadata:" : {
+                    "skus": list_skus,
+                    "features": {
+                        "feature_01": "inventory_available_mean",
+                        "feature_02": "inventory_available_median_abs_deviation",
+                        "feature_03": "inventory_available_slope"
+                    }
+                }
+            }
+
+def cluster_data(registry, product: dict) -> dict:
+    with tracer.start_as_current_span("domain.service.cluster_data"):
+        logger.info("def.cluster_data()")
+
+        if not product:
+            logger.warning("No values enough provided for inventory inference.")
+            return "false"
+        sku = product.get('sku', '')
+        
+        headers = {"Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Request-ID": REQUEST_ID_CTX.get()}
+
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={sku}&window={WINDOWSIZE}", 
+            method="GET",
+            headers=headers,
+            timeout=10.0)
+
+        raw_items = res_inventory_window.get("data", []) if isinstance(res_inventory_window.get("data"), dict) else res_inventory_window
+        if isinstance(raw_items, dict):
+            raw_items = raw_items.get("data", [])
+
+        inventory_pending = []
+        for item in raw_items:
+            pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
+            if pending is not None:
+                inventory_pending.append(pending)
+
+        inventory_available = []
+        for item in raw_items:
+            available = item.get("available") if isinstance(item, dict) else getattr(item, "available", None)
+            if available is not None:
+                inventory_available.append(available)
+
+        # -----------------------------------------------------
+        # Calculate PENDING ORDER the stats using a2a stat
+        sub_agent = registry.get("COMPUTE_STAT")
+        sub_agent_host = _get_sub_agent_url(sub_agent)
+        sub_agent_name = sub_agent["name"]
+        sub_agent_msg_type = "COMPUTE_STAT"
+        
+        envelope = A2AEnvelope(
+            source_agent=settings.APP_NAME,
+            target_agent=sub_agent_name,
+            message_type=sub_agent_msg_type,
+            payload={
+                "data": inventory_available,
+            }
+        )
+        
+        inventory_available_stat= send_message(sub_agent_host,
+            method="POST",
+            headers=headers,
+            body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
+            timeout=10.0)
+        
+        # extract the features
+        inventory_available_slope = (
+            inventory_available_stat.get("data", {})
+            .get("payload", {})
+            .get("data", {})
+            .get("n_slope")
+        ) if isinstance(inventory_available_stat, dict) else None
+
+        inventory_available_mean = (
+            inventory_available_stat.get("data", {})
+            .get("payload", {})
+            .get("data", {})
+            .get("mean")
+        ) if isinstance(inventory_available_stat, dict) else None
+
+        inventory_available_median_abs_deviation = (
+            inventory_available_stat.get("data", {})
+            .get("payload", {})
+            .get("data", {})
+            .get("median_abs_deviation")
+        ) if isinstance(inventory_available_stat, dict) else None
+
+
+        print("-------------inventory_data-----------------------")
+        print(f"sku {sku} = {inventory_available}")
+        print(inventory_available_slope)
+        print(inventory_available_mean)
+        print(inventory_available_median_abs_deviation)    
+        print("-------------inventory_data-----------------------")
+
+        features = {
+            "feature_01": inventory_available_mean,
+            "feature_02": inventory_available_median_abs_deviation,
+            "feature_03": inventory_available_slope
+        } 
+
+        # Cluster the products using the a2a cluster agent
+        sub_agent = registry.get("CLUSTER_DATA")
+        sub_agent_host = _get_sub_agent_url(sub_agent)
+        sub_agent_name = sub_agent["name"]
+        sub_agent_msg_type = "CLUSTER_DATA"
+            
+        envelope = A2AEnvelope(
+            source_agent=settings.APP_NAME,
+            target_agent=sub_agent_name,
+            message_type=sub_agent_msg_type,
+            payload=features
+        )
+
+        features_fitted=send_message(sub_agent_host,
+                method="POST",
+                headers=headers,
+                body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
+                timeout=10.0)
+        
+        return {"data": features_fitted.get('data',{}).get('payload',{}).get('cluster',{}) if isinstance(features_fitted, dict) else None    ,
+                "metadata:" : {
+                    "sku": sku,
+                    "inventory_available": inventory_available,
+                    "features": {
+                        "feature_01": "inventory_available_mean",
+                        "feature_02": "inventory_available_median_abs_deviation",
+                        "feature_03": "inventory_available_slope"
+                    }
+                }
+            }
