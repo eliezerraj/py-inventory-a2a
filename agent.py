@@ -30,7 +30,6 @@ class AgentImplementation:
         self.msg_type = "no-message-setup"
 
         self.agent_card_register = {}
-        self.by_id = {}
 
     def is_authorized(self, envelope: A2AEnvelope) -> bool:
         """The actual rate-limiting logic."""
@@ -48,14 +47,7 @@ class AgentImplementation:
             response.raise_for_status()
             card = response.json()
 
-        logger.debug("card %s", card)
-
-        self.by_id[card["name"]] = card
-
-        for skill in card.get("skills", []):
-            skill_id = skill.get("id")
-            if skill_id:
-                self.agent_card_register[skill_id] = card
+        self.agent_card_register[card["name"]] = card
 
     def receive(self, envelope: A2AEnvelope) -> A2AEnvelope:
         with tracer.start_as_current_span("agent.receive") as span:
@@ -72,8 +64,6 @@ class AgentImplementation:
                 # Set the response
                 if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
                     self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
-                elif envelope.message_type == "INVENTORY_PRICE_ANALYSIS":
-                    self.msg_type = "INVENTORY_PRICE_ANALYSIS_RESULT"
                 elif envelope.message_type == "INVENTORY_CLUSTER_FIT":
                     self.msg_type = "INVENTORY_CLUSTER_FIT_RESULT"
                 elif envelope.message_type == "INVENTORY_CLUSTER_DATA":

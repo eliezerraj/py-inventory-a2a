@@ -87,7 +87,7 @@ def cluster_fit(registry, product: dict) -> dict:
 
             # -----------------------------------------------------
             # Calculate PENDING ORDER the stats using a2a stat
-            sub_agent = registry.get("COMPUTE_STAT")
+            sub_agent = registry.get("py-stat-inference-a2a.localhost")
             sub_agent_host = _get_sub_agent_url(sub_agent)
             sub_agent_name = sub_agent["name"]
             sub_agent_msg_type = "COMPUTE_STAT"
@@ -146,7 +146,7 @@ def cluster_fit(registry, product: dict) -> dict:
 
         # ------------------------------------------
         # Cluster the products using the a2a cluster agent
-        sub_agent = registry.get("CLUSTER_FIT")
+        sub_agent = registry.get("py-kmeans-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "CLUSTER_FIT"
@@ -211,7 +211,7 @@ def cluster_data(registry, product: dict) -> dict:
 
         # -----------------------------------------------------
         # Calculate PENDING ORDER the stats using a2a stat
-        sub_agent = registry.get("COMPUTE_STAT")
+        sub_agent = registry.get("py-stat-inference-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "COMPUTE_STAT"
@@ -268,7 +268,7 @@ def cluster_data(registry, product: dict) -> dict:
         } 
 
         # Cluster the products using the a2a cluster agent
-        sub_agent = registry.get("CLUSTER_DATA")
+        sub_agent = registry.get("py-kmeans-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "CLUSTER_DATA"

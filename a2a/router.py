@@ -2,7 +2,7 @@ import logging
 
 from shared.exception.exceptions import A2ARouterError
 
-from infrastructure.adapter.handler import handler_price_analysis, handler_inventory_runout_analysis, handler_cluster_fit, handler_cluster_data
+from infrastructure.adapter.handler import  handler_inventory_runout_analysis, handler_cluster_fit, handler_cluster_data
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import StatusCode, Status 
@@ -22,9 +22,7 @@ class A2ARouter:
             logger.info("def.route()")  
 
             try:
-                if envelope.message_type == "INVENTORY_PRICE_ANALYSIS":
-                    return handler_price_analysis(registry, envelope.payload)
-                elif envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
+                if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
                     return handler_inventory_runout_analysis(registry, envelope.payload)
                 elif envelope.message_type == "INVENTORY_CLUSTER_FIT":
                     return handler_cluster_fit(registry, envelope.payload)
