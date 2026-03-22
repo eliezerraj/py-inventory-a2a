@@ -6,6 +6,8 @@ from a2a.envelope import A2AEnvelope
 from infrastructure.adapter.http_client import send_message
 from infrastructure.config.config import settings
 
+from domain.service.cluster_service import cluster_data
+
 from opentelemetry import trace
 
 #---------------------------------
@@ -171,7 +173,12 @@ def price_analysis(registry, product: dict) -> dict:
             data.append(result)
 
         return {"data": data}
-    
+
+"""
+Steady Runout: Low Lead Time + High Inventory + Low Slope 
+Warning Runout: Low Lead Time  + High Inventory + High Slope  
+Critical Runout: High Lead Time  + Low Inventory +  High Slope  
+"""
 def inventory_runout_analysis(registry, product: dict) -> dict:
     with tracer.start_as_current_span("domain.service.inventory_runout_analysis"):
         logger.info("def.inventory_runout_analysis()")    
@@ -281,6 +288,14 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         #print(inventory_available_stats)
         #print("-------------res_inventory_window-----------------------")
         #print(res_inventory_window)
+
+
+        # Check the current cluster assigend
+
+        res_cluster = cluster_data(registry, product)
+        print("-------------cluster_data-----------------------")
+        print(res_cluster)
+        print("-------------cluster_data-----------------------")
 
         current_inventory_available = None
         lead_time = None

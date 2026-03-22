@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 WINDOWSIZE=settings.WINDOWSIZE
 
-LIMIT=30
+LIMIT=40
 OFFSET=0
 
 #---------------------------------
@@ -290,6 +290,9 @@ def cluster_data(registry, product: dict) -> dict:
                 "metadata:" : {
                     "sku": sku,
                     "inventory_available": inventory_available,
+                    "inventory_available_mean": inventory_available_mean,
+                    "inventory_available_median_abs_deviation": inventory_available_median_abs_deviation,
+                    "inventory_available_slope": inventory_available_slope,
                     "features": {
                         "feature_01": "inventory_available_mean",
                         "feature_02": "inventory_available_median_abs_deviation",

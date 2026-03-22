@@ -3,19 +3,19 @@ export VERSION=0.1
 export ACCOUNT=aws:999999999
 export APP_NAME=py-inventory-a2a.localhost
 export HOST=127.0.0.1
-export URL_AGENT=http://127.0.0.1:7000
-export PORT=7100
+export URL_AGENT=http://127.0.0.1:8000
+export PORT=8000
 
 export WINDOWSIZE=14
-# cart item service
+# go-cart item service
 export URL_SERVICE_00=http://127.0.0.1:7001
-# inventory service
+# go-inventory service
 export URL_SERVICE_01=http://127.0.0.1:7000
 
-# agent stat
-export URL_AGENT_REGISTER_00=http://127.0.0.1:8000
-# agent kmeans
-export URL_AGENT_REGISTER_01=http://127.0.0.1:8001
+# agent py-stat-a2a
+export URL_AGENT_REGISTER_00=http://127.0.0.1:8100
+# agent py-kmeans-a2a
+export URL_AGENT_REGISTER_01=http://127.0.0.1:8101
 
 export SESSION_TIMEOUT=3000
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://pi-home-01.architecture.caradhras.io:4318/v1/traces
