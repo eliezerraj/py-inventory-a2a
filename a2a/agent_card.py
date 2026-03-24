@@ -30,9 +30,19 @@ AGENT_CARD = {
             "name": "Inventory Cluster Fit",
             "description": "Performs clustering analysis on inventory data to identify patterns and optimize stock levels.",
             "tags": ["inventory", "analytics", "clustering"],
-            "examples": [
-                '{"product": {"sku": "coffee-12"}}'
-            ],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "product": {
+                        "type": "object",
+                        "properties": {
+                        "sku": { "type": "string" }
+                        },
+                        "required": "sku"
+                    }
+                }
+            },
+            "examples": '{"product": {"sku": "coffee-12"}}',
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         },
@@ -41,9 +51,19 @@ AGENT_CARD = {
             "name": "Inventory Cluster Data",
             "description": "Provides detailed data from clustering analysis on inventory to support decision-making.",
             "tags": ["inventory", "analytics", "clustering"],
-            "examples": [
-                '{"product": {"sku": "coffee-12"}}'
-            ],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "product": {
+                    "type": "object",
+                    "properties": {
+                    "sku": { "type": "string" }
+                    },
+                    "required": "sku"
+                    }
+                }
+            },
+            "examples": '{"product": {"sku": "coffee-12"}}',
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         },
@@ -52,9 +72,19 @@ AGENT_CARD = {
             "name": "Inventory Runout Analysis",
             "description": "Calculates days of cover based on inventory availability and pending demand trends.",
             "tags": ["inventory", "forecasting", "runout"],
-            "examples": [
-                '{"product": {"sku": "coffee-12"}}'
-            ],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "product": {
+                    "type": "object",
+                    "properties": {
+                    "sku": { "type": "string" }
+                    },
+                    "required": "sku"
+                    }
+                }
+            },
+            "examples": '{"product": {"sku": "coffee-12"}}',
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         }
