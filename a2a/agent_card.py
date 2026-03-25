@@ -26,13 +26,44 @@ AGENT_CARD = {
     "defaultOutputModes": ["application/json"],
     "skills": [
         {
-            "id": "PRICE_ANALYSIS",
-            "name": "Price Analysis",
-            "description": "Analyzes product pricing and quantity trends from cart item history.",
-            "tags": ["inventory", "pricing", "analytics"],
-            "examples": [
-                '{"product": [{"sku": "coffee-12"}]}'
-            ],
+            "id": "INVENTORY_CLUSTER_FIT",
+            "name": "Inventory Cluster Fit",
+            "description": "Performs clustering analysis on inventory data to identify patterns and optimize stock levels.",
+            "tags": ["inventory", "analytics", "clustering"],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "product": {
+                        "type": "object",
+                        "properties": {
+                        "sku": { "type": "string" }
+                        },
+                        "required": "sku"
+                    }
+                }
+            },
+            "examples": {"product": {"sku": "coffee-12"}},
+            "inputModes": ["application/json"],
+            "outputModes": ["application/json"],
+        },
+        {
+            "id": "INVENTORY_CLUSTER_DATA",
+            "name": "Inventory Cluster Data",
+            "description": "Provides detailed data from clustering analysis on inventory to support decision-making.",
+            "tags": ["inventory", "analytics", "clustering"],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "product": {
+                    "type": "object",
+                    "properties": {
+                    "sku": { "type": "string" }
+                    },
+                    "required": "sku"
+                    }
+                }
+            },
+            "examples": {"product": {"sku": "coffee-12"}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         },
@@ -41,9 +72,19 @@ AGENT_CARD = {
             "name": "Inventory Runout Analysis",
             "description": "Calculates days of cover based on inventory availability and pending demand trends.",
             "tags": ["inventory", "forecasting", "runout"],
-            "examples": [
-                '{"product": {"sku": "coffee-12"}}'
-            ],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                "product": {
+                    "type": "object",
+                    "properties": {
+                    "sku": { "type": "string" }
+                    },
+                    "required": "sku"
+                    }
+                }
+            },
+            "examples": {"product": {"sku": "coffee-12"}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         }

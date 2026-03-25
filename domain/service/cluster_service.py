@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 WINDOWSIZE=settings.WINDOWSIZE
 
-LIMIT=30
+LIMIT=40
 OFFSET=0
 
 #---------------------------------
@@ -87,7 +87,7 @@ def cluster_fit(registry, product: dict) -> dict:
 
             # -----------------------------------------------------
             # Calculate PENDING ORDER the stats using a2a stat
-            sub_agent = registry.get("COMPUTE_STAT")
+            sub_agent = registry.get("py-stat-inference-a2a.localhost")
             sub_agent_host = _get_sub_agent_url(sub_agent)
             sub_agent_name = sub_agent["name"]
             sub_agent_msg_type = "COMPUTE_STAT"
@@ -146,7 +146,7 @@ def cluster_fit(registry, product: dict) -> dict:
 
         # ------------------------------------------
         # Cluster the products using the a2a cluster agent
-        sub_agent = registry.get("CLUSTER_FIT")
+        sub_agent = registry.get("py-kmeans-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "CLUSTER_FIT"
@@ -211,7 +211,7 @@ def cluster_data(registry, product: dict) -> dict:
 
         # -----------------------------------------------------
         # Calculate PENDING ORDER the stats using a2a stat
-        sub_agent = registry.get("COMPUTE_STAT")
+        sub_agent = registry.get("py-stat-inference-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "COMPUTE_STAT"
@@ -268,7 +268,7 @@ def cluster_data(registry, product: dict) -> dict:
         } 
 
         # Cluster the products using the a2a cluster agent
-        sub_agent = registry.get("CLUSTER_DATA")
+        sub_agent = registry.get("py-kmeans-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
         sub_agent_msg_type = "CLUSTER_DATA"
@@ -280,17 +280,33 @@ def cluster_data(registry, product: dict) -> dict:
             payload=features
         )
 
-        features_fitted=send_message(sub_agent_host,
+        return_data = {}
+        try:
+            features_fitted= send_message(sub_agent_host,
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
                 timeout=10.0)
+                 
+            if features_fitted.get("ok") is not True:
+                logger.error(f"Cluster agent returned error: {features_fitted}")
+                return_data = {"error": "Cluster agent returned error", "details": features_fitted}
+            else:
+                return_data = features_fitted.get('data',{}).get('payload',{}).get('cluster',{}) if isinstance(features_fitted, dict) else None
+        except Exception as e:
+            logger.error(f"Error occurred while sending message to cluster agent: {e}")
+            return_data = e
         
-        return {"data": features_fitted.get('data',{}).get('payload',{}).get('cluster',{}) if isinstance(features_fitted, dict) else None    ,
+        return {"data": return_data ,
                 "metadata:" : {
                     "sku": sku,
                     "inventory_available": inventory_available,
-                    "features": {
+                    "features_data": { 
+                        "inventory_available_mean": inventory_available_mean,
+                        "inventory_available_median_abs_deviation": inventory_available_median_abs_deviation,
+                        "inventory_available_slope": inventory_available_slope,
+                    },
+                    "features_label": {
                         "feature_01": "inventory_available_mean",
                         "feature_02": "inventory_available_median_abs_deviation",
                         "feature_03": "inventory_available_slope"
