@@ -42,7 +42,7 @@ AGENT_CARD = {
                     }
                 }
             },
-            "examples": '{"product": {"sku": "coffee-12"}}',
+            "examples": {"product": {"sku": "coffee-12"}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         },
@@ -63,7 +63,7 @@ AGENT_CARD = {
                     }
                 }
             },
-            "examples": '{"product": {"sku": "coffee-12"}}',
+            "examples": {"product": {"sku": "coffee-12"}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         },
@@ -84,7 +84,7 @@ AGENT_CARD = {
                     }
                 }
             },
-            "examples": '{"product": {"sku": "coffee-12"}}',
+            "examples": {"product": {"sku": "coffee-12"}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         }

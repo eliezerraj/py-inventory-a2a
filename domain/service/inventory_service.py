@@ -144,9 +144,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         #print("-------------res_inventory_window-----------------------")
         #print(res_inventory_window)
 
-
         # Check the current cluster assigend
-
         res_cluster = cluster_data(registry, product)
         print("-------------cluster_data-----------------------")
         print(res_cluster)
@@ -164,6 +162,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
 
         return {
             "sku": product.get("sku"),
+            "cluster": res_cluster.get("data", {}).get("cluster", {}).get("id", "cluster_unknown") if isinstance(res_cluster, dict) else "cluster_unknown",
             "action": "CRITICAL" if days_of_cover < inventory_data[-1].get("product", {}).get("lead_time", 0) else "OK",
             "metadata": {  
                 "inventory_pending_slope": inventory_pending_slope,
