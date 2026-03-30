@@ -51,24 +51,24 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
                     "X-Request-ID": REQUEST_ID_CTX.get()}
 
         # -----------------------------------------------------
-        # get the timeseries inventory window data (service inventory). WINDONSIZE * 2 is because the endpoint returns dupe lines (pending and available in different lines )
-        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE*2}", 
+        # get the timeseries inventory window data (service inventory).
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/inventory/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE}&offset=0", 
             method="GET",
             headers=headers,
-            timeout=10.0)
+            timeout=settings.REQUEST_TIMEOUT)
 
         raw_items = res_inventory_window.get("data", []) if isinstance(res_inventory_window.get("data"), dict) else res_inventory_window
         if isinstance(raw_items, dict):
             raw_items = raw_items.get("data", [])
 
-        #extract inventory only the lines with pending 
-        raw_items = [item for item in raw_items if isinstance(item, dict) and "pending" in item]
+        #extract inventory only the lines with sold 
+        raw_items = [item for item in raw_items if isinstance(item, dict) and "sold" in item]
 
-        inventory_pending = []
+        inventory_sold = []
         for item in raw_items:
-            pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
-            if pending is not None:
-                inventory_pending.append(pending)
+            sold = item.get("sold") if isinstance(item, dict) else getattr(item, "sold", None)
+            if sold is not None:
+                inventory_sold.append(sold)
 
         inventory_available = []
         for item in raw_items:
@@ -76,8 +76,8 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             if available is not None:
                 inventory_available.append(available)
 
-        print("-------------inventory_pending-----------------------")
-        print(inventory_pending)
+        print("-------------inventory_sold-----------------------")
+        print(inventory_sold)
         print("-------------inventory_available-----------------------")
         print(inventory_available)
         print("-------------inventory_available-----------------------")
@@ -94,24 +94,31 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             target_agent=sub_agent_name,
             message_type=sub_agent_msg_type,
             payload={
-                "data": inventory_pending,
+                "data": inventory_sold,
             }
         )
         
-        inventory_pending_stats = send_message(sub_agent_host,
+        inventory_sold_stats = send_message(sub_agent_host,
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-            timeout=10.0)
+            timeout=settings.REQUEST_TIMEOUT)
 
         # extract the features
-        inventory_pending_slope = (
-            inventory_pending_stats.get("data", {})
+        inventory_sold_slope = (
+            inventory_sold_stats.get("data", {})
+            .get("payload", {})
+            .get("data", {})
+            .get("slope")
+        ) if isinstance(inventory_sold_stats, dict) else None
+
+        inventory_sold_n_slope = (
+            inventory_sold_stats.get("data", {})
             .get("payload", {})
             .get("data", {})
             .get("n_slope")
-        ) if isinstance(inventory_pending_stats, dict) else None
-
+        ) if isinstance(inventory_sold_stats, dict) else None
+        
         # -----------------------------------------------------
         # calculate INVENTORY AVAILABLE using a2a stat
         envelope = A2AEnvelope(
@@ -127,28 +134,29 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-            timeout=10.0)
+            timeout=settings.REQUEST_TIMEOUT)
 
         # extract the features
         inventory_available_slope = (
             inventory_available_stats.get("data", {})
             .get("payload", {})
             .get("data", {})
-            .get("n_slope")
+            .get("slope")
         ) if isinstance(inventory_available_stats, dict) else None
 
+        inventory_available_n_slope = (
+            inventory_available_stats.get("data", {})
+            .get("payload", {})
+            .get("data", {})
+            .get("n_slope")
+        ) if isinstance(inventory_available_stats, dict) else None
+        
         #print("-------------inventory_pending_stats-----------------------")
         #print(inventory_pending_stats)
         #print("-------------inventory_available_stats-----------------------")
         #print(inventory_available_stats)
         #print("-------------res_inventory_window-----------------------")
         #print(res_inventory_window)
-
-        # Check the current cluster assigend
-        res_cluster = cluster_data(registry, product)
-        print("-------------cluster_data-----------------------")
-        print(res_cluster)
-        print("-------------cluster_data-----------------------")
 
         current_inventory_available = None
         lead_time = None
@@ -158,19 +166,30 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
                 current_inventory_available = inventory_data[-1].get("available")
                 lead_time = inventory_data[-1].get("product", {}).get("lead_time")
 
-        days_of_cover = current_inventory_available/abs(inventory_pending_slope) if inventory_pending_slope and inventory_pending_slope != 0 else None
+        days_of_cover = current_inventory_available/abs(inventory_available_slope) if inventory_available_slope and inventory_available_slope != 0 else None
+
+        # Check the current cluster assigend
+        res_cluster = cluster_data(registry, product)
+        print("-------------cluster_data-----------------------")
+        print(res_cluster)
+        print("-------------cluster_data-----------------------")
 
         return {
             "sku": product.get("sku"),
-            "cluster": res_cluster.get("data", {}).get("cluster", {}).get("id", "cluster_unknown") if isinstance(res_cluster, dict) else "cluster_unknown",
-            "action": "CRITICAL" if days_of_cover < inventory_data[-1].get("product", {}).get("lead_time", 0) else "OK",
+            "action": "INVENTORY:CRITICAL" if days_of_cover < inventory_data[-1].get("product", {}).get("lead_time", 0) else "INVENTORY:OK",
+            "k_means_data":{
+                "cluster_id": res_cluster.get("data", {}).get("cluster", {}).get("id", "cluster_unknown") if isinstance(res_cluster, dict) else "cluster_unknown",
+                "label_map": res_cluster.get("data", {}).get("label_map", {}) if isinstance(res_cluster, dict) else {},  
+            },
             "metadata": {  
-                "inventory_pending_slope": inventory_pending_slope,
+                "inventory_sold_slope": inventory_sold_slope,
+                "inventory_sold_n_slope": inventory_sold_n_slope,
                 "inventory_available_slope": inventory_available_slope,
+                "inventory_available_n_slope": inventory_available_n_slope,
                 "current_inventory_available": current_inventory_available,
                 "lead_time": lead_time,
                 "days_of_cover": days_of_cover,
-                "inventory_pending": inventory_pending,
+                "inventory_sold": inventory_sold,
                 "inventory_available": inventory_available
             }
         }
