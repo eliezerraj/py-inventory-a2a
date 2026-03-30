@@ -43,10 +43,10 @@ def cluster_fit(registry, product: dict) -> dict:
                     "Accept": "application/json",
                     "X-Request-ID": REQUEST_ID_CTX.get()}
 
-        res_list_inventory = send_message( f"{settings.URL_SERVICE_01}/list/inventory/product?sku={sku}&window={LIMIT}&offset={OFFSET}", 
+        res_list_inventory = send_message( f"{settings.URL_SERVICE_01}/inventory/list/product?sku={sku}&window={LIMIT}&offset={OFFSET}", 
             method="GET",
             headers=headers,
-            timeout=10.0)
+            timeout=settings.REQUEST_TIMEOUT)
 
         raw_items = res_list_inventory.get("data", []) if isinstance(res_list_inventory.get("data"), dict) else res_list_inventory
         if isinstance(raw_items, dict):
@@ -64,20 +64,25 @@ def cluster_fit(registry, product: dict) -> dict:
             print(f"sku: {sku}")
 
             # get timeseries inventory data
-            res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={sku}&window={WINDOWSIZE}", 
+            res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/inventory/timeseries/product?sku={sku}&window={WINDOWSIZE}&offset=0", 
                 method="GET",
                 headers=headers,
-                timeout=10.0)
+                timeout=settings.REQUEST_TIMEOUT)
+
+            if not res_inventory_window or res_inventory_window.get("data") == []:
+                logger.warning(f"No inventory data returned for SKU: {sku}")
+                continue
 
             raw_items = res_inventory_window.get("data", []) if isinstance(res_inventory_window.get("data"), dict) else res_inventory_window
             if isinstance(raw_items, dict):
                 raw_items = raw_items.get("data", [])
 
-            inventory_pending = []
+            # not used in the clustering but can be used for debugging or future features
+            inventory_sold = []
             for item in raw_items:
-                pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
-                if pending is not None:
-                    inventory_pending.append(pending)
+                sold = item.get("sold") if isinstance(item, dict) else getattr(item, "sold", None)
+                if sold is not None:
+                    inventory_sold.append(sold)
 
             inventory_available = []
             for item in raw_items:
@@ -105,14 +110,14 @@ def cluster_fit(registry, product: dict) -> dict:
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-                timeout=10.0)
+                timeout=settings.REQUEST_TIMEOUT)
 
             # extract the features
             inventory_available_slope = (
                 inventory_available_stat.get("data", {})
                 .get("payload", {})
                 .get("data", {})
-                .get("n_slope")
+                .get("slope")
             ) if isinstance(inventory_available_stat, dict) else None
 
             inventory_available_mean = (
@@ -131,9 +136,9 @@ def cluster_fit(registry, product: dict) -> dict:
 
             print("-------------inventory_data-----------------------")
             print(f"sku {sku} = {inventory_available}")
-            print(inventory_available_slope)
             print(inventory_available_mean)
-            print(inventory_available_median_abs_deviation)    
+            print(inventory_available_median_abs_deviation)
+            print(inventory_available_slope)  
             print("-------------inventory_data-----------------------")
 
             features = {
@@ -162,7 +167,7 @@ def cluster_fit(registry, product: dict) -> dict:
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-                timeout=10.0)
+                timeout=settings.REQUEST_TIMEOUT)
 
         return {"data": list_features_fitted.get('data',{}).get('payload',{}).get('data',{}) if isinstance(list_features_fitted, dict) else None    ,
                 "metadata:" : {
@@ -188,20 +193,25 @@ def cluster_data(registry, product: dict) -> dict:
                     "Accept": "application/json",
                     "X-Request-ID": REQUEST_ID_CTX.get()}
 
-        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/timeseries/product?sku={sku}&window={WINDOWSIZE}", 
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/inventory/timeseries/product?sku={sku}&window={WINDOWSIZE}&offset=0", 
             method="GET",
             headers=headers,
             timeout=10.0)
+
+        if not res_inventory_window or res_inventory_window == []:
+            logger.warning(f"No inventory data returned for SKU: {sku}")
+            return {"error": "false"}
 
         raw_items = res_inventory_window.get("data", []) if isinstance(res_inventory_window.get("data"), dict) else res_inventory_window
         if isinstance(raw_items, dict):
             raw_items = raw_items.get("data", [])
 
-        inventory_pending = []
+        # not used in the clustering but can be used for debugging or future features
+        inventory_sold = []
         for item in raw_items:
-            pending = item.get("pending") if isinstance(item, dict) else getattr(item, "pending", None)
-            if pending is not None:
-                inventory_pending.append(pending)
+            sold = item.get("sold") if isinstance(item, dict) else getattr(item, "sold", None)
+            if sold is not None:
+                inventory_sold.append(sold)
 
         inventory_available = []
         for item in raw_items:
@@ -210,7 +220,7 @@ def cluster_data(registry, product: dict) -> dict:
                 inventory_available.append(available)
 
         # -----------------------------------------------------
-        # Calculate PENDING ORDER the stats using a2a stat
+        # Calculate AVAILABLE INVENTORY the stats using a2a stat
         sub_agent = registry.get("py-stat-inference-a2a.localhost")
         sub_agent_host = _get_sub_agent_url(sub_agent)
         sub_agent_name = sub_agent["name"]
@@ -229,7 +239,7 @@ def cluster_data(registry, product: dict) -> dict:
             method="POST",
             headers=headers,
             body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-            timeout=10.0)
+            timeout=settings.REQUEST_TIMEOUT)
         
         # extract the features
         inventory_available_slope = (
@@ -252,7 +262,6 @@ def cluster_data(registry, product: dict) -> dict:
             .get("data", {})
             .get("median_abs_deviation")
         ) if isinstance(inventory_available_stat, dict) else None
-
 
         print("-------------inventory_data-----------------------")
         print(f"sku {sku} = {inventory_available}")
@@ -286,7 +295,7 @@ def cluster_data(registry, product: dict) -> dict:
                 method="POST",
                 headers=headers,
                 body=envelope.model_dump() if hasattr(envelope, "model_dump") else envelope.dict(),
-                timeout=10.0)
+                timeout=settings.REQUEST_TIMEOUT)
                  
             if features_fitted.get("ok") is not True:
                 logger.error(f"Cluster agent returned error: {features_fitted}")
