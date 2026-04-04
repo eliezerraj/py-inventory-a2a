@@ -138,7 +138,6 @@ def handle_a2a_message(envelope: A2AEnvelope, request: Request):
     
         try:
             result = agent.receive(envelope)
-
             span.set_status(Status(StatusCode.OK))
             return result
             

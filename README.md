@@ -1,6 +1,27 @@
 ## py-inventory-a2a
 
-py-inventory-a2a
+py-inventory-a2a is a a2a agent to analyze the inventory subjects.
+
+
+
+
+days_of_cover_ratio:
+
+$$S = \min\left(1, \frac{C}{L \times k}\right)$$
+
+$C$: days_of_cover.
+
+$L$: lead_time.
+
+$k$: A "Buffer Multiplier." (e.g., $k=2$ means you consider yourself "Full" if you have twice the lead time covered).
+
+slope_ratio:
+
+$$V = \min\left(1, \frac{|m|}{m_{max}}\right)$$
+
+$|m|$: The absolute value of your inventory_available_slope.
+
+$m_{max}$: Your "Target Speed." This is the depletion rate you consider to be "100% capacity" or "Full Speed" for your operations.
 
 ## diagram
 
@@ -80,7 +101,11 @@ py-inventory-a2a
         "message_type": "INVENTORY_RUNOUT_ANALYSIS",
         "payload": {
             "product": {
-                "sku": "cheese-fr-12"
+                "sku": "cheese-fr-20"
+            },
+            "period" :{
+                "step_behind": 7,
+                "duration": 14
             }
         }
     }'

@@ -3,8 +3,8 @@ export VERSION=0.1
 export ACCOUNT=aws:999999999
 export APP_NAME=py-inventory-a2a.localhost
 export HOST=127.0.0.1
-export URL_AGENT=http://127.0.0.1:8000
 export PORT=8000
+export URL_AGENT=http://$(HOST):$(PORT)
 
 export WINDOWSIZE=14
 # go-cart item service
