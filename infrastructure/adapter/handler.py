@@ -29,7 +29,7 @@ def handler_inventory_runout_analysis(registry, payload: dict) -> dict:
 
         validated_payload = validate_payload(payload)
 
-        result = inventory_runout_analysis(registry, validated_payload["product"])
+        result = inventory_runout_analysis(registry, validated_payload["product"], validated_payload.get("period", {}))
         
         return {
             "message": "inventory runout analysis requested",

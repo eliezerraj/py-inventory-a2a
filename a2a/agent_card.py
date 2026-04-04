@@ -5,7 +5,7 @@ AGENT_CARD = {
     "description": "Inventory agent handles inventory management and optimization tasks, providing real-time insights and recommendations to ensure efficient stock levels and reduce costs.",
     "version": settings.VERSION,
     "provider": {
-        "organization": "eliezer-junior Org.",
+        "organization": "eliezer-junior",
         "url": settings.URL_AGENT,
     },
     "documentationUrl": f"{settings.URL_AGENT}/info",
@@ -75,16 +75,24 @@ AGENT_CARD = {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                "product": {
-                    "type": "object",
-                    "properties": {
-                    "sku": { "type": "string" }
+                    "product": {
+                        "type": "object",
+                            "properties": {
+                                "sku": { "type": "string", "description": "Stock Keeping Unit identifier for the product" }
+                            },
+                        "required": ["sku"]
                     },
-                    "required": "sku"
+                    "period": {
+                        "type": "object",
+                        "properties": {
+                            "duration": { "type": "number", "description": "Duration of the time window for analysis in days" },
+                            "step_behind": { "type": "number", "description": "Number of days to step back from the current date for the analysis window" }
+                        },
+                        "required": ["duration", "step_behind"]
                     }
                 }
             },
-            "examples": {"product": {"sku": "coffee-12"}},
+            "examples": {"product": {"sku": "coffee-12"}, "period": {"duration": 30, "step_behind": 0}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
         }

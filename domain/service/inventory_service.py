@@ -16,7 +16,9 @@ from opentelemetry import trace
 tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
 
+#default values for inventory runout analysis
 WINDOWSIZE=settings.WINDOWSIZE
+OFFSET=0
 
 #---------------------------------
 def _get_sub_agent_url(sub_agent: dict) -> str | None:
@@ -29,22 +31,38 @@ def _get_sub_agent_url(sub_agent: dict) -> str | None:
     return sub_agent.get("url") if isinstance(sub_agent, dict) else None
 
 #---------------------------------
+
+def calculate_stock_index(days_of_cover, lead_time):
+    if lead_time == 0:
+        return 1.0 if days_of_cover > 0 else 0.0
+    
+    # Calculate ratio
+    index = days_of_cover / lead_time
+    
+    # Clamp the value between 0 and 1
+    return max(0.0, min(1.0, index))
+
 """
 Steady Runout: Low Lead Time + High Inventory + Low Slope 
 Warning Runout: Low Lead Time  + High Inventory + High Slope  
 Critical Runout: High Lead Time  + Low Inventory +  High Slope  
 """
-def inventory_runout_analysis(registry, product: dict) -> dict:
+def inventory_runout_analysis(registry, product: dict, period: dict) -> dict:
     with tracer.start_as_current_span("domain.service.inventory_runout_analysis"):
         logger.info("def.inventory_runout_analysis()")    
 
         print("------------------------------------")
         print(product)
+        print(period)
         print("------------------------------------")
 
         if not product:
             logger.warning("No values enough provided for inventory inference.")
             return "false"
+        
+        if not period:
+            logger.warning("No period provided for inventory inference, using default values.")
+            period = {"step_behind": WINDOWSIZE, "duration": OFFSET}
         
         headers = {"Content-Type": "application/json",
                     "Accept": "application/json",
@@ -52,7 +70,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
 
         # -----------------------------------------------------
         # get the timeseries inventory window data (service inventory).
-        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/inventory/timeseries/product?sku={product.get('sku', '')}&window={WINDOWSIZE}&offset=0", 
+        res_inventory_window = send_message( f"{settings.URL_SERVICE_01}/inventory/timeseries/product?sku={product.get('sku', '')}&window={period['duration']}&offset={period['step_behind']}", 
             method="GET",
             headers=headers,
             timeout=settings.REQUEST_TIMEOUT)
@@ -61,8 +79,16 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
         if isinstance(raw_items, dict):
             raw_items = raw_items.get("data", [])
 
+        if not raw_items:
+            logger.warning(f"No inventory data found for sku: {product.get('sku')}")
+            return f"No inventory data found for sku: {product.get('sku')}"
+
         #extract inventory only the lines with sold 
         raw_items = [item for item in raw_items if isinstance(item, dict) and "sold" in item]
+
+        if not raw_items:
+            logger.warning(f"No valid sold items found in inventory data for sku: {product.get('sku')}")
+            return f"No valid sold items found in inventory data for sku: {product.get('sku')}"
 
         inventory_sold = []
         for item in raw_items:
@@ -189,6 +215,7 @@ def inventory_runout_analysis(registry, product: dict) -> dict:
                 "current_inventory_available": current_inventory_available,
                 "lead_time": lead_time,
                 "days_of_cover": days_of_cover,
+                "days_of_cover_index": calculate_stock_index(days_of_cover, lead_time) if days_of_cover is not None and lead_time is not None else None,
                 "inventory_sold": inventory_sold,
                 "inventory_available": inventory_available
             }
