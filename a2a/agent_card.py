@@ -95,6 +95,38 @@ AGENT_CARD = {
             "examples": {"product": {"sku": "coffee-12"}, "period": {"duration": 30, "step_behind": 0}},
             "inputModes": ["application/json"],
             "outputModes": ["application/json"],
+        },
+        {
+            "id": "INVENTORY_WINDOWED_RUNOUT_ANALYSIS",
+            "name": "Inventory Windowed Runout Analysis",
+            "description": "Calculates days of cover based on inventory availability and pending demand trends over multiple time windows.",
+            "tags": ["inventory", "forecasting", "runout"],
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "product": {
+                        "type": "object",
+                            "properties": {
+                                "sku": { "type": "string", "description": "Stock Keeping Unit identifier for the product" }
+                            },
+                        "required": ["sku"]
+                    },
+                    "period": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "duration": { "type": "number", "description": "Duration of the time window for analysis in days" },
+                                "step_behind": { "type": "number", "description": "Number of days to step back from the current date for the analysis window" }
+                            },
+                            "required": ["duration", "step_behind"]
+                        }
+                    }
+                }
+            },
+            "examples": {"product": {"sku": "coffee-12"}, "period": [{"duration": 30, "step_behind": 0}]},
+            "inputModes": ["application/json"],
+            "outputModes": ["application/json"],
         }
     ]
 }

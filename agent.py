@@ -64,6 +64,8 @@ class AgentImplementation:
                 # Set the response
                 if envelope.message_type == "INVENTORY_RUNOUT_ANALYSIS":
                     self.msg_type = "INVENTORY_RUNOUT_ANALYSIS_RESULT"
+                elif envelope.message_type == "INVENTORY_WINDOWED_RUNOUT_ANALYSIS":
+                    self.msg_type = "INVENTORY_WINDOWED_RUNOUT_ANALYSIS_RESULT"
                 elif envelope.message_type == "INVENTORY_CLUSTER_FIT":
                     self.msg_type = "INVENTORY_CLUSTER_FIT_RESULT"
                 elif envelope.message_type == "INVENTORY_CLUSTER_DATA":

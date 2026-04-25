@@ -3,9 +3,19 @@
 py-inventory-a2a is a a2a agent to analyze the inventory subjects.
 
 
+## Normalize features for TEM map
 
+### days_of_cover_ratio:
 
-days_of_cover_ratio:
+Normalize how much DOC exists until depletation
+
+Examples
+
+0.1 = Low DOC close to depletation (High Risk)
+
+0.5 = Healthy DOC
+
+0.9 = High DOC far away to depletation (Low Risk())
 
 $$S = \min\left(1, \frac{C}{L \times k}\right)$$
 
@@ -15,13 +25,21 @@ $L$: lead_time.
 
 $k$: A "Buffer Multiplier." (e.g., $k=2$ means you consider yourself "Full" if you have twice the lead time covered).
 
-slope_ratio:
+##
 
-$$V = \min\left(1, \frac{|m|}{m_{max}}\right)$$
+### slope_accelaration_per_doc_ratio:
 
-$|m|$: The absolute value of your inventory_available_slope.
+Normalize how fast the inventory is consume per DOC
 
-$m_{max}$: Your "Target Speed." This is the depletion rate you consider to be "100% capacity" or "Full Speed" for your operations.
+$$V_{accel} = \min\left(1, \frac{|\text{slope}| / \text{days\_of\_cover}}{\text{Threshold}}\right)$$
+
+$slope$: Your daily unit depletion.
+
+$days\_of\_cover$: days_of_cover feature
+
+$threshold$: velocity index of acceleration, avoid to hit 1.0 easily
+
+##
 
 ## diagram
 

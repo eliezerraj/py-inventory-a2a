@@ -1,7 +1,7 @@
 import logging
 from opentelemetry import trace
 
-from domain.service.inventory_service import inventory_runout_analysis
+from domain.service.inventory_service import inventory_runout_analysis, inventory_windowed_runout_analysis, inventory_windowed_runout_analysis
 from domain.service.cluster_service import cluster_fit, cluster_data
 from shared.exception.exceptions import A2ARouterError
 
@@ -33,6 +33,19 @@ def handler_inventory_runout_analysis(registry, payload: dict) -> dict:
         
         return {
             "message": "inventory runout analysis requested",
+            "result": result
+        }
+
+def handler_inventory_windowed_runout_analysis(registry, payload: dict) -> dict:
+    with tracer.start_as_current_span("infrastructure.adapter.handler_inventory_windowed_runout_analysis") as span:
+        logger.info("def.handler_inventory_windowed_runout_analysis()")  
+
+        validated_payload = validate_payload(payload)
+
+        result = inventory_windowed_runout_analysis(registry, validated_payload["product"], validated_payload.get("period", {}))
+        
+        return {
+            "message": "inventory windowed runout analysis requested",
             "result": result
         }
     
